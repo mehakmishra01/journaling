@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Journal — Hero Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* scene */
+  --wall:#241610; --wall-deep:#150C07;
+  --desk:#4A2E1C; --desk-lit:#8A5730;
+  --parchment:#E9DDC1; --parchment-sh:#BFAA85;
+  --flame-core:#FFF7E2; --flame-body:#F9C766; --flame-edge:#DE7F26;
+  --glow:#F2B45C; --brass:#B58B4C; --ink:#241A14;
+  /* page */
+  --page:#F2E8D5; --page-warm:#EFE0C4; --page-ink:#3A2A1E;
+  --ease-film:cubic-bezier(.16,.84,.44,1);
+  --rx:0deg; --ry:0deg;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(120% 90% at 78% 34%, #F7EBD2 0%, var(--page) 42%, #EADCC2 100%);
+  color:var(--page-ink);
+  font-family:'Cormorant Garamond',Georgia,serif;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* ---------- nav ---------- */
+.nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:26px clamp(24px,4vw,64px);
+  border-bottom:1px solid rgba(58,42,30,.12);
+}
+.brand{font-size:22px;letter-spacing:.34em;font-weight:400;text-transform:uppercase}
+.brand i{color:var(--brass);font-style:normal;font-size:14px;vertical-align:middle;margin-left:10px}
+.links{display:flex;gap:34px;font-family:'Jost',sans-serif;font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:400}
+.links a{color:rgba(58,42,30,.72);text-decoration:none;padding-bottom:5px;transition:color .25s}
+.links a:hover{color:var(--page-ink)}
+.links a.on{color:var(--page-ink);border-bottom:1.5px solid var(--brass)}
+.search{
+  font-family:'Jost',sans-serif;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  border:1px solid rgba(58,42,30,.28);border-radius:999px;padding:11px 22px;background:none;color:inherit;cursor:pointer;
+  transition:border-color .25s,background .25s;
+}
+.search:hover{border-color:var(--brass);background:rgba(181,139,76,.08)}
+@media(max-width:900px){.links{display:none}}
+
+/* ---------- hero ---------- */
+.hero{
+  display:grid;grid-template-columns:1fr minmax(360px,560px);
+  gap:clamp(24px,5vw,80px);align-items:center;
+  padding:clamp(30px,5vh,64px) clamp(24px,4vw,64px) 40px;
+  max-width:1560px;margin:0 auto;position:relative;
+}
+.greet{font-family:'Caveat',cursive;font-size:26px;color:#8A6A46;margin-bottom:18px}
+.title{font-size:clamp(58px,8.4vw,124px);line-height:.94;font-weight:300;letter-spacing:-.01em}
+.title em{display:block;font-style:italic;font-weight:300;margin-left:.02em}
+.rule{width:74px;height:1px;background:rgba(58,42,30,.4);margin:38px 0 30px}
+.sub{font-size:clamp(19px,1.5vw,25px);line-height:1.6;max-width:19ch;color:rgba(58,42,30,.86)}
+.cta-row{display:flex;align-items:center;gap:30px;margin-top:44px;flex-wrap:wrap}
+.cta{
+  font-family:'Jost',sans-serif;font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:400;
+  background:#3B2A1D;color:#F4EAD8;border:none;padding:19px 34px;cursor:pointer;position:relative;overflow:hidden;
+  transition:transform .35s var(--ease-film),box-shadow .35s var(--ease-film);
+}
+.cta:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(59,42,29,.28)}
+.cta::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(242,180,92,.5),transparent 70%);transform:translateX(-120%);transition:transform .75s var(--ease-film)}
+.cta:hover::after{transform:translateX(120%)}
+.count{font-family:'Jost',sans-serif;font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:rgba(58,42,30,.6)}
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;padding-top:26px}
+  .stage-wrap{order:-1}
+}
+
+/* ---------- stage ---------- */
+.stage-wrap{position:relative;display:flex;justify-content:center}
+/* warm light spilling out of the frame onto the page */
+.spill{
+  position:absolute;inset:-14% -22% -14% -34%;pointer-events:none;
+  background:radial-gradient(58% 50% at 62% 40%, rgba(242,180,92,.42) 0%, rgba(242,180,92,.16) 38%, transparent 72%);
+  filter:blur(6px);animation:spill 6.2s ease-in-out infinite;
+}
+@keyframes spill{0%,100%{opacity:.85}50%{opacity:1}}
+
+.frame{
+  position:relative;width:100%;max-width:540px;aspect-ratio:6/7;
+  padding:14px;background:linear-gradient(150deg,#6B4527,#3E2716 45%,#5C3A21);
+  box-shadow:0 34px 70px rgba(52,32,18,.42), 0 3px 0 rgba(255,232,190,.25) inset;
+  perspective:1400px;
+}
+.frame::after{content:"";position:absolute;inset:8px;border:1px solid rgba(214,175,110,.55);pointer-events:none;z-index:9}
+
+.scene{
+  position:relative;width:100%;height:100%;overflow:hidden;
+  transform-style:preserve-3d;
+  transform:rotateX(var(--rx)) rotateY(var(--ry));
+  transition:transform .5s var(--ease-film);
+  background:#150C07;
+}
+.layer{position:absolute;inset:0;transform-style:preserve-3d}
+.layer svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* depth: translateZ + compensating scale so nothing changes size at rest */
+.l-back  {transform:translateZ(-120px) scale(1.086);filter:blur(2.4px)}
+.l-books {transform:translateZ(-90px)  scale(1.064);filter:blur(1.7px)}
+.l-desk  {transform:translateZ(-40px)  scale(1.029)}
+.l-far   {transform:translateZ(-60px)  scale(1.043);filter:blur(1.1px)}
+.l-cand  {transform:translateZ(-20px)  scale(1.014)}
+.l-paper {transform:translateZ(30px)   scale(.979)}
+.l-bottle{transform:translateZ(60px)   scale(.957)}
+.l-quill {transform:translateZ(90px)   scale(.936)}
+.l-fore  {transform:translateZ(130px)  scale(.907);filter:blur(.7px)}
+.l-note  {transform:translateZ(165px)  scale(.882)}
+
+/* ---------- flame ---------- */
+.fl-core,.fl-body,.fl-edge{transform-box:fill-box;transform-origin:50% 100%}
+.fl-edge{animation:flkA 4.7s ease-in-out infinite}
+.fl-body{animation:flkB 3.1s ease-in-out infinite}
+.fl-core{animation:flkC 2.3s ease-in-out infinite}
+@keyframes flkA{0%,100%{transform:scaleY(1) skewX(0deg)}22%{transform:scaleY(1.07) skewX(3deg) translateX(1px)}51%{transform:scaleY(.93) skewX(-3deg) translateX(-1.2px)}76%{transform:scaleY(1.04) skewX(1.5deg)}}
+@keyframes flkB{0%,100%{transform:scaleY(1) skewX(-1deg)}18%{transform:scaleY(.94) skewX(2.5deg)}44%{transform:scaleY(1.08) skewX(-2deg) translateX(.8px)}72%{transform:scaleY(.97) skewX(1deg)}}
+@keyframes flkC{0%,100%{transform:scaleY(1.02) translateX(0)}30%{transform:scaleY(.92) translateX(-.6px)}58%{transform:scaleY(1.06) translateX(.7px)}}
+.halo{mix-blend-mode:screen;transform-box:fill-box;transform-origin:50% 50%;animation:halo 3.1s ease-in-out infinite}
+.halo2{mix-blend-mode:screen;transform-box:fill-box;transform-origin:50% 50%;animation:halo 4.7s ease-in-out infinite reverse}
+@keyframes halo{0%,100%{opacity:.78;transform:scale(.98)}50%{opacity:1;transform:scale(1.045)}}
+.pool{mix-blend-mode:screen;animation:halo 3.1s ease-in-out infinite}
+
+/* ---------- quill ---------- */
+.quill-in{position:absolute;inset:0;animation:quillIn 1500ms var(--ease-film) both}
+@keyframes quillIn{0%{transform:translateY(-72vh) rotate(-19deg);opacity:0}45%{opacity:1}100%{transform:translateY(0) rotate(0);opacity:1}}
+.quill-float{position:absolute;inset:0;animation:quillFloat 7.5s ease-in-out 1.5s infinite}
+@keyframes quillFloat{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(1.5deg)}}
+.barbs{transform-box:fill-box;transform-origin:50% 100%;animation:barbs 11s ease-in-out infinite}
+@keyframes barbs{0%,100%{transform:rotate(-.7deg)}50%{transform:rotate(.7deg)}}
+.drip{transform-box:fill-box;transform-origin:50% 0%;animation:drip 15s linear infinite;opacity:0}
+@keyframes drip{
+  0%,70%{opacity:0;transform:translateY(0) scale(.3,.3)}
+  72%{opacity:.95;transform:translateY(0) scale(.7,.9)}
+  75%{opacity:1;transform:translateY(4px) scale(.55,1.35)}
+  86%{opacity:1;transform:translateY(96px) scale(.7,1.15)}
+  89%{opacity:.95;transform:translateY(104px) scale(1.7,.45)}
+  94%,100%{opacity:0;transform:translateY(104px) scale(2.6,.3)}
+}
+
+/* ---------- handwriting ---------- */
+.hw path{stroke-dasharray:var(--len,320);stroke-dashoffset:var(--len,320);animation:draw 3.6s ease-out 1.7s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.corner{transform-box:fill-box;transform-origin:100% 0%;animation:corner 9s ease-in-out infinite}
+@keyframes corner{0%,100%{transform:rotate(0) translate(0,0)}50%{transform:rotate(-1.6deg) translate(-2px,1px)}}
+
+/* ---------- dust ---------- */
+.dust{position:absolute;inset:0;pointer-events:none}
+.mote{position:absolute;border-radius:50%;background:#FFE4B4;filter:blur(1.1px);opacity:0}
+@keyframes drift{
+  0%{transform:translate3d(0,0,0);opacity:0}
+  12%{opacity:.34}
+  55%{opacity:.16}
+  78%{opacity:.3}
+  100%{transform:translate3d(var(--dx),var(--dy),0);opacity:0}
+}
+
+/* ---------- overlays ---------- */
+.grain{position:absolute;inset:-50%;width:200%;height:200%;opacity:.055;mix-blend-mode:overlay;pointer-events:none;z-index:8;animation:grain 1s steps(8) infinite}
+@keyframes grain{
+  0%{transform:translate(0,0)}12.5%{transform:translate(-3%,2%)}25%{transform:translate(2%,-3%)}
+  37.5%{transform:translate(-2%,-2%)}50%{transform:translate(3%,1%)}62.5%{transform:translate(-1%,3%)}
+  75%{transform:translate(2%,2%)}87.5%{transform:translate(-3%,-1%)}100%{transform:translate(0,0)}
+}
+.vig{position:absolute;inset:0;pointer-events:none;z-index:7;
+  background:radial-gradient(72% 62% at 60% 42%, transparent 30%, rgba(11,6,3,.5) 82%, rgba(11,6,3,.82) 100%)}
+
+/* ---------- tape note ---------- */
+.note{
+  position:absolute;top:7%;left:-9%;z-index:12;
+  font-family:'Caveat',cursive;font-size:19px;line-height:1.32;color:#4B3826;
+  background:linear-gradient(168deg,#FBF4E4,#EDE1CA);
+  padding:15px 20px 17px;transform:rotate(-4deg);
+  box-shadow:0 10px 24px rgba(52,32,18,.26);
+  max-width:190px;
+}
+.note::before{content:"";position:absolute;top:-9px;left:50%;translate:-50% 0;width:66px;height:20px;
+  background:linear-gradient(#F6E9CC,#E4D3B0);opacity:.72;mix-blend-mode:multiply;transform:rotate(-3deg)}
+
+/* ---------- hint ---------- */
+.hint{position:absolute;bottom:-34px;left:50%;translate:-50% 0;font-family:'Jost',sans-serif;
+  font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:rgba(58,42,30,.42);
+  transition:opacity .6s;animation:blink 3s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.42}50%{opacity:.9}}
+.hint.gone{opacity:0}
+
+/* ---------- stats ---------- */
+.stats{display:flex;gap:clamp(28px,6vw,90px);flex-wrap:wrap;
+  padding:0 clamp(24px,4vw,64px) 60px;max-width:1560px;margin:0 auto}
+.stat b{display:block;font-family:'Jost',sans-serif;font-size:10.5px;letter-spacing:.22em;
+  text-transform:uppercase;font-weight:400;color:rgba(58,42,30,.5);margin-bottom:9px}
+.stat span{font-size:33px;font-weight:300}
+.stat.glow span{color:#B0762C}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .scene{transform:none!important}
+  .hw path{stroke-dashoffset:0}
+  .quill-in{transform:none}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand">The Journal <i>●</i></div>
+  <div class="links">
+    <a href="#" class="on">Home</a><a href="#">Memories</a><a href="#">Calendar</a><a href="#">Mood</a><a href="#">Reflections</a>
+  </div>
+  <button class="search">⌕ &nbsp;Search</button>
+</nav>
+
+<section class="hero">
+  <div class="copy">
+    <p class="greet">Good evening, Mehak.</p>
+    <h1 class="title">My <em>Journal</em></h1>
+    <div class="rule"></div>
+    <p class="sub">A quiet place for everything you don't want to forget.</p>
+    <div class="cta-row">
+      <button class="cta">+ &nbsp;Write today's entry</button>
+      <span class="count">24 memories preserved</span>
+    </div>
+  </div>
+
+  <div class="stage-wrap">
+    <div class="spill"></div>
+    <div class="frame" id="frame">
+      <div class="note">by candlelight,<br>as always</div>
+
+      <div class="scene" id="scene">
+
+        <!-- 1. BACKDROP -->
+        <div class="layer l-back">
+          <svg viewBox="0 0 600 700" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <radialGradient id="wallPool" cx="74%" cy="30%" r="70%">
+                <stop offset="0%" stop-color="#9A5F2C" stop-opacity=".95"/>
+                <stop offset="38%" stop-color="#5A3419" stop-opacity=".78"/>
+                <stop offset="100%" stop-color="#160D07"/>
+              </radialGradient>
+            </defs>
+            <rect width="600" height="700" fill="#170E08"/>
+            <rect width="600" height="700" fill="url(#wallPool)"/>
+          </svg>
+        </div>
+
+        <!-- 2. BOOKS -->
+        <div class="layer l-books">
+          <svg viewBox="0 0 600 700">
+            <defs>
+              <linearGradient id="lea1" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#241610"/><stop offset="62%" stop-color="#472B1A"/><stop offset="100%" stop-color="#7A4A26"/>
+              </linearGradient>
+              <linearGradient id="lea2" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#1E140F"/><stop offset="66%" stop-color="#3E2718"/><stop offset="100%" stop-color="#6B4223"/>
+              </linearGradient>
+              <linearGradient id="lea3" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#2A1A11"/><stop offset="58%" stop-color="#513120"/><stop offset="100%" stop-color="#8A5730"/>
+              </linearGradient>
+            </defs>
+            <g>
+              <rect x="52" y="322" width="372" height="30" rx="3" fill="url(#lea2)" transform="rotate(-.7 238 337)"/>
+              <rect x="52" y="322" width="372" height="4" fill="#8A5730" opacity=".38" transform="rotate(-.7 238 337)"/>
+              <rect x="64" y="292" width="352" height="30" rx="3" fill="url(#lea1)" transform="rotate(.6 240 307)"/>
+              <rect x="64" y="292" width="352" height="4" fill="#A06A38" opacity=".34" transform="rotate(.6 240 307)"/>
+              <rect x="46" y="262" width="386" height="30" rx="3" fill="url(#lea3)" transform="rotate(-.4 239 277)"/>
+              <rect x="240" y="266" width="150" height="2" fill="#C79A56" opacity=".5"/>
+              <rect x="46" y="262" width="386" height="4" fill="#B0763C" opacity=".4"/>
+              <rect x="78" y="234" width="322" height="28" rx="3" fill="url(#lea2)" transform="rotate(.9 239 248)"/>
+              <rect x="240" y="238" width="120" height="2" fill="#C79A56" opacity=".38"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- 3. DESK -->
+        <div class="layer l-desk">
+          <svg viewBox="0 0 600 700">
+            <defs>
+              <linearGradient id="wood" x1=".18" y1="0" x2=".9" y2="1">
+                <stop offset="0%" stop-color="#38220F"/><stop offset="42%" stop-color="#5C3A1E"/>
+                <stop offset="72%" stop-color="#8A5730"/><stop offset="100%" stop-color="#3A2211"/>
+              </linearGradient>
+              <radialGradient id="deskPool" cx="70%" cy="18%" r="62%">
+                <stop offset="0%" stop-color="#F2B45C" stop-opacity=".5"/>
+                <stop offset="55%" stop-color="#C07C2E" stop-opacity=".16"/>
+                <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+              </radialGradient>
+              <filter id="woodGrain" x="0" y="0" width="100%" height="100%">
+                <feTurbulence type="fractalNoise" baseFrequency=".02 .6" numOctaves="3" seed="7"/>
+                <feColorMatrix type="saturate" values="0"/>
+              </filter>
+            </defs>
+            <path d="M0,436 L600,398 L600,700 L0,700 Z" fill="url(#wood)"/>
+            <path d="M0,436 L600,398 L600,700 L0,700 Z" fill="#fff" opacity=".05" filter="url(#woodGrain)"/>
+            <path d="M0,436 L600,398 L600,404 L0,442 Z" fill="#A06A38" opacity=".45"/>
+            <ellipse class="pool" cx="410" cy="470" rx="270" ry="140" fill="url(#deskPool)"/>
+          </svg>
+        </div>
+
+        <!-- 4. FAR CANDLE -->
+        <div class="layer l-far">
+          <svg viewBox="0 0 600 700">
+            <defs>
+              <linearGradient id="waxF" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#8A7150"/><stop offset="55%" stop-color="#D9C08C"/><stop offset="100%" stop-color="#F4DFAE"/>
+              </linearGradient>
+              <radialGradient id="haloF"><stop offset="0%" stop-color="#FFD08A" stop-opacity=".8"/><stop offset="100%" stop-color="#FFB347" stop-opacity="0"/></radialGradient>
+            </defs>
+            <ellipse cx="352" cy="382" rx="26" ry="7" fill="#120A05" opacity=".55"/>
+            <path d="M340,300 C338,340 341,368 340,378 L366,378 C365,366 368,336 366,300 Z" fill="url(#waxF)"/>
+            <ellipse cx="353" cy="300" rx="13" ry="4" fill="#EEDCAE"/>
+            <circle class="halo" cx="353" cy="278" r="46" fill="url(#haloF)"/>
+            <g transform="translate(353,296)">
+              <path class="fl-edge" d="M0,0 C-8,-6 -9,-18 -4,-27 C-2,-32 0,-35 0,-39 C0,-35 2,-32 4,-27 C9,-18 8,-6 0,0 Z" fill="#E38F33" opacity=".8"/>
+              <path class="fl-body" d="M0,0 C-5,-4 -6,-12 -2.5,-18 C-1,-21 0,-24 0,-27 C0,-24 1,-21 2.5,-18 C6,-12 5,-4 0,0 Z" fill="#FBD07D"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- 5. CANDLES -->
+        <div class="layer l-cand">
+          <svg viewBox="0 0 600 700">
+            <defs>
+              <linearGradient id="wax" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#6F5A3C"/><stop offset="30%" stop-color="#B49A6C"/>
+                <stop offset="66%" stop-color="#EFDCB0"/><stop offset="100%" stop-color="#FFF3D4"/>
+              </linearGradient>
+              <linearGradient id="wax2" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#5F4C33"/><stop offset="34%" stop-color="#A98F63"/>
+                <stop offset="70%" stop-color="#E9D4A8"/><stop offset="100%" stop-color="#FBEDCB"/>
+              </linearGradient>
+              <linearGradient id="brassG" x1="0" y1="0" x2="1" y2=".4">
+                <stop offset="0%" stop-color="#4A3316"/><stop offset="42%" stop-color="#A57C3A"/>
+                <stop offset="72%" stop-color="#E4C179"/><stop offset="100%" stop-color="#6B4A1F"/>
+              </linearGradient>
+              <radialGradient id="haloBig"><stop offset="0%" stop-color="#FFE0AA" stop-opacity=".92"/><stop offset="45%" stop-color="#FFBB55" stop-opacity=".38"/><stop offset="100%" stop-color="#FF9F2E" stop-opacity="0"/></radialGradient>
+              <radialGradient id="subsurf"><stop offset="0%" stop-color="#FFCE86" stop-opacity=".85"/><stop offset="100%" stop-color="#FFCE86" stop-opacity="0"/></radialGradient>
+            </defs>
+
+            <!-- contact shadows -->
+            <ellipse cx="428" cy="432" rx="44" ry="11" fill="#100904" opacity=".62"/>
+            <ellipse cx="516" cy="444" rx="40" ry="10" fill="#100904" opacity=".58"/>
+
+            <!-- TALL CANDLE -->
+            <g transform="rotate(-1.2 428 340)">
+              <path d="M412,252 C409,300 413,360 411,396 L446,396 C444,358 448,300 445,252 Z" fill="url(#wax)"/>
+              <!-- drips -->
+              <path d="M412,266 C405,286 409,300 411,316 C414,300 413,282 415,268 Z" fill="#F7E7BE" opacity=".9"/>
+              <path d="M441,282 C447,300 443,318 444,332 C439,318 440,300 438,286 Z" fill="#FFF3D4" opacity=".55"/>
+              <ellipse cx="429" cy="252" rx="17" ry="5.5" fill="#F8E7BB"/>
+              <ellipse cx="429" cy="253" rx="10" ry="3" fill="#C9A876"/>
+              <ellipse cx="432" cy="330" rx="20" ry="60" fill="url(#subsurf)" opacity=".5"/>
+              <!-- holder -->
+              <path d="M405,396 L452,396 L446,414 L411,414 Z" fill="url(#brassG)"/>
+              <rect x="422" y="414" width="14" height="14" fill="url(#brassG)"/>
+              <ellipse cx="429" cy="431" rx="30" ry="8" fill="url(#brassG)"/>
+              <ellipse cx="429" cy="428" rx="30" ry="8" fill="#D8B36A" opacity=".55"/>
+            </g>
+            <circle class="halo" cx="429" cy="224" r="92" fill="url(#haloBig)"/>
+            <g transform="translate(429,250)">
+              <path class="fl-edge" d="M0,0 C-13,-9 -15,-30 -7,-45 C-3.5,-53 0,-58 0,-66 C0,-58 3.5,-53 7,-45 C15,-30 13,-9 0,0 Z" fill="#E0842B" opacity=".82"/>
+              <path class="fl-body" d="M0,0 C-8,-6 -9,-21 -4,-31 C-2,-37 0,-41 0,-47 C0,-41 2,-37 4,-31 C9,-21 8,-6 0,0 Z" fill="#F9C766"/>
+              <path class="fl-core" d="M0,-3 C-4,-8 -4.5,-16 -2,-22 C-1,-25 0,-27 0,-30 C0,-27 1,-25 2,-22 C4.5,-16 4,-8 0,-3 Z" fill="#FFF7E2"/>
+            </g>
+
+            <!-- SHORT CANDLE -->
+            <g transform="rotate(1.6 516 372)">
+              <path d="M502,304 C500,346 503,384 502,408 L532,408 C530,384 534,346 531,304 Z" fill="url(#wax2)"/>
+              <path d="M528,320 C534,338 530,352 531,366 C526,352 527,336 525,324 Z" fill="#FFF3D4" opacity=".5"/>
+              <ellipse cx="517" cy="304" rx="15" ry="5" fill="#F5E3B6"/>
+              <ellipse cx="517" cy="305" rx="9" ry="2.6" fill="#C2A16F"/>
+              <ellipse cx="520" cy="360" rx="17" ry="46" fill="url(#subsurf)" opacity=".45"/>
+              <path d="M496,408 L538,408 L533,424 L501,424 Z" fill="url(#brassG)"/>
+              <ellipse cx="517" cy="442" rx="27" ry="7" fill="url(#brassG)"/>
+              <rect x="511" y="424" width="12" height="14" fill="url(#brassG)"/>
+              <ellipse cx="517" cy="439" rx="27" ry="7" fill="#D8B36A" opacity=".5"/>
+            </g>
+            <circle class="halo2" cx="517" cy="282" r="72" fill="url(#haloBig)"/>
+            <g transform="translate(517,302)">
+              <path class="fl-edge" d="M0,0 C-11,-8 -13,-25 -6,-38 C-3,-45 0,-49 0,-56 C0,-49 3,-45 6,-38 C13,-25 11,-8 0,0 Z" fill="#E0842B" opacity=".8" style="animation-delay:-1.4s"/>
+              <path class="fl-body" d="M0,0 C-7,-5 -8,-18 -3.5,-27 C-1.6,-31 0,-35 0,-40 C0,-35 1.6,-31 3.5,-27 C8,-18 7,-5 0,0 Z" fill="#F9C766" style="animation-delay:-.9s"/>
+              <path class="fl-core" d="M0,-2 C-3.4,-7 -3.8,-14 -1.7,-19 C-.8,-21 0,-23 0,-26 C0,-23 .8,-21 1.7,-19 C3.8,-14 3.4,-7 0,-2 Z" fill="#FFF7E2" style="animation-delay:-.5s"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- 6. PARCHMENT -->
+        <div class="layer l-paper">
+          <svg viewBox="0 0 600 700">
+            <defs>
+              <linearGradient id="pap" x1=".1" y1="0" x2=".95" y2=".7">
+                <stop offset="0%" stop-color="#9C876190"/><stop offset="28%" stop-color="#CBB88F"/>
+                <stop offset="68%" stop-color="#E9DDC1"/><stop offset="100%" stop-color="#F6EDD6"/>
+              </linearGradient>
+              <linearGradient id="pap2" x1=".1" y1="0" x2=".9" y2=".8">
+                <stop offset="0%" stop-color="#7E6B4B"/><stop offset="45%" stop-color="#B9A67E"/><stop offset="100%" stop-color="#DBCDAC"/>
+              </linearGradient>
+              <filter id="tear">
+                <feTurbulence type="fractalNoise" baseFrequency=".038" numOctaves="4" seed="12" result="n"/>
+                <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/>
+              </filter>
+              <filter id="fibre" x="0" y="0" width="100%" height="100%">
+                <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3"/>
+                <feColorMatrix type="saturate" values="0"/>
+              </filter>
+            </defs>
+
+            <!-- under sheet -->
+            <g filter="url(#tear)" transform="rotate(-4.5 320 560)">
+              <path d="M118,486 L498,470 L506,664 L128,676 Z" fill="url(#pap2)"/>
+            </g>
+            <!-- contact shadow -->
+            <ellipse cx="330" cy="668" rx="220" ry="20" fill="#120A05" opacity=".45"/>
+
+            <!-- top sheet -->
+            <g class="corner">
+              <g filter="url(#tear)" transform="rotate(2.2 330 552)">
+                <path d="M150,462 L520,452 L528,650 L158,660 Z" fill="url(#pap)"/>
+                <path d="M150,462 L520,452 L528,650 L158,660 Z" fill="#6B5735" opacity=".07" filter="url(#fibre)"/>
+              </g>
+            </g>
+
+            <!-- handwriting -->
+            <g class="hw" transform="rotate(2.2 330 552)" stroke="#3A2B1E" fill="none" stroke-linecap="round" opacity=".68">
+              <path style="--len:300" stroke-width="1.5" d="M186,494 c14,-7 22,6 34,1 c16,-6 20,7 36,2 c18,-6 24,6 40,1 c20,-6 26,7 46,1 c22,-6 30,5 48,0 c20,-5 30,4 46,-1"/>
+              <path style="--len:300" stroke-width="1.4" style="animation-delay:1.85s" d="M182,522 c16,-6 20,7 38,2 c18,-5 22,6 40,1 c20,-5 26,6 44,1 c22,-5 28,5 48,0 c20,-4 28,4 44,-1"/>
+              <path style="--len:290" stroke-width="1.5" d="M188,550 c14,-6 24,6 38,1 c18,-6 22,7 40,2 c20,-5 24,5 44,0 c20,-5 28,5 46,0 c18,-4 26,3 40,-1"/>
+              <path style="--len:280" stroke-width="1.3" d="M184,578 c16,-6 22,6 40,1 c18,-5 22,6 42,1 c20,-5 26,5 44,0 c20,-5 28,4 44,-1"/>
+              <path style="--len:250" stroke-width="1.5" d="M190,606 c14,-6 22,6 36,1 c18,-5 24,6 42,1 c20,-5 26,5 44,0"/>
+              <path style="--len:150" stroke-width="1.4" d="M186,632 c14,-5 22,5 36,1 c16,-4 22,5 38,1"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- 7. INK BOTTLE -->
+        <div class="layer l-bottle">
+          <svg viewBox="0 0 600 700">
+            <defs>
+              <linearGradient id="glass" x1=".05" y1="0" x2=".95" y2=".6">
+                <stop offset="0%" stop-color="#120C09"/><stop offset="40%" stop-color="#2A1C13"/>
+                <stop offset="78%" stop-color="#5E3E22"/><stop offset="100%" stop-color="#1A1109"/>
+              </linearGradient>
+              <linearGradient id="brassB" x1="0" y1="0" x2="1" y2=".4">
+                <stop offset="0%" stop-color="#3E2A11"/><stop offset="38%" stop-color="#9B7333"/>
+                <stop offset="68%" stop-color="#EBC981"/><stop offset="100%" stop-color="#5C3F1A"/>
+              </linearGradient>
+            </defs>
+            <ellipse cx="238" cy="452" rx="56" ry="13" fill="#0E0704" opacity=".7"/>
+            <!-- base -->
+            <ellipse cx="238" cy="446" rx="52" ry="12" fill="url(#brassB)"/>
+            <path d="M192,446 C196,428 200,420 202,412 L274,412 C276,420 280,428 284,446 Z" fill="url(#brassB)"/>
+            <path d="M198,432 h80" stroke="#F0D191" stroke-width="1.2" opacity=".4"/>
+            <!-- glass well -->
+            <path d="M204,412 C200,392 202,372 208,360 L268,360 C274,372 276,392 272,412 Z" fill="url(#glass)"/>
+            <path d="M256,366 C262,378 264,394 261,408" stroke="#E7BE7C" stroke-width="3" opacity=".55" fill="none" stroke-linecap="round"/>
+            <path d="M214,372 C211,386 212,398 215,406" stroke="#C89654" stroke-width="1.4" opacity=".22" fill="none"/>
+            <!-- ink line -->
+            <path d="M206,386 C224,392 250,392 270,386 L269,404 C250,410 224,410 207,404 Z" fill="#0B0705" opacity=".85"/>
+            <!-- collar -->
+            <ellipse cx="238" cy="360" rx="34" ry="9" fill="url(#brassB)"/>
+            <ellipse cx="238" cy="358" rx="34" ry="9" fill="#D9B369" opacity=".5"/>
+            <ellipse cx="238" cy="358" rx="20" ry="5.5" fill="#0A0604"/>
+            <path d="M210,356 q28,-9 56,0" stroke="#F4D89A" stroke-width="1.3" fill="none" opacity=".65"/>
+          </svg>
+        </div>
+
+        <!-- 8. QUILL -->
+        <div class="layer l-quill">
+          <div class="quill-in"><div class="quill-float">
+            <svg viewBox="0 0 600 700">
+              <defs>
+                <linearGradient id="feath" x1=".1" y1=".2" x2=".95" y2=".8">
+                  <stop offset="0%" stop-color="#6E6154"/><stop offset="34%" stop-color="#B9AC9A"/>
+                  <stop offset="70%" stop-color="#EFE6D6"/><stop offset="100%" stop-color="#FFFAF0"/>
+                </linearGradient>
+                <linearGradient id="shaft" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#6B5C48"/><stop offset="55%" stop-color="#D8C9AE"/><stop offset="100%" stop-color="#8A7A62"/>
+                </linearGradient>
+              </defs>
+              <g transform="translate(238,356) rotate(19)">
+                <!-- shadow of quill on the scene -->
+                <path d="M2,-4 C6,-90 8,-170 4,-286" stroke="#0E0804" stroke-width="7" opacity=".26" fill="none" transform="translate(-9,7)"/>
+                <g class="barbs">
+                  <!-- feather vane -->
+                  <path d="M0,-92 C24,-140 32,-206 13,-296 C7,-305 3,-307 0,-308 C-3,-306 -9,-298 -15,-282 C-30,-214 -22,-146 0,-92 Z" fill="url(#feath)"/>
+                  <!-- barb lines -->
+                  <g stroke="#8C7F6C" stroke-width=".8" opacity=".42">
+                    <path d="M0,-110 L16,-128"/><path d="M0,-130 L20,-150"/><path d="M0,-150 L23,-171"/>
+                    <path d="M0,-170 L24,-192"/><path d="M0,-190 L24,-212"/><path d="M0,-210 L23,-231"/>
+                    <path d="M0,-230 L20,-250"/><path d="M0,-250 L17,-268"/><path d="M0,-270 L13,-284"/>
+                    <path d="M0,-120 L-13,-137"/><path d="M0,-145 L-16,-163"/><path d="M0,-170 L-18,-189"/>
+                    <path d="M0,-195 L-18,-214"/><path d="M0,-220 L-16,-238"/><path d="M0,-245 L-13,-261"/>
+                  </g>
+                  <!-- rim light along the flame side -->
+                  <path d="M13,-296 C32,-206 24,-140 0,-92" stroke="#FFE9BE" stroke-width="1.9" fill="none" opacity=".72"/>
+                </g>
+                <!-- rachis + nib -->
+                <path d="M0,-300 C3,-200 2,-96 1,-14 L-3,-14 C-4,-96 -3,-200 -6,-300 Z" fill="url(#shaft)"/>
+                <path d="M-1,-16 C2,-9 2,-3 0,2 C-2,-3 -4,-9 -3,-16 Z" fill="#241A14"/>
+                <path d="M1,-14 C2,-8 2,-3 0,2" stroke="#FFE1A8" stroke-width=".9" fill="none" opacity=".6"/>
+                <!-- ink droplet -->
+                <ellipse class="drip" cx="0" cy="4" rx="3.4" ry="4.6" fill="#191009"/>
+              </g>
+            </svg>
+          </div></div>
+        </div>
+
+        <!-- 9. FOREGROUND -->
+        <div class="layer l-fore">
+          <svg viewBox="0 0 600 700">
+            <defs>
+              <linearGradient id="key" x1="0" y1="0" x2="1" y2=".6">
+                <stop offset="0%" stop-color="#3A2A12"/><stop offset="48%" stop-color="#9C7638"/><stop offset="100%" stop-color="#D9B36B"/>
+              </linearGradient>
+              <radialGradient id="seal"><stop offset="0%" stop-color="#B2322F"/><stop offset="70%" stop-color="#7A1F20"/><stop offset="100%" stop-color="#4A1214"/></radialGradient>
+            </defs>
+            <!-- antique key -->
+            <g transform="rotate(-24 108 622)">
+              <ellipse cx="106" cy="632" rx="42" ry="8" fill="#0E0704" opacity=".5"/>
+              <circle cx="78" cy="622" r="13" fill="none" stroke="url(#key)" stroke-width="6"/>
+              <rect x="88" y="619" width="58" height="5.5" rx="2" fill="url(#key)"/>
+              <rect x="132" y="624" width="6" height="11" rx="1.5" fill="url(#key)"/>
+              <rect x="142" y="624" width="5" height="8" rx="1.5" fill="url(#key)"/>
+            </g>
+            <!-- wax seal -->
+            <g transform="rotate(8 508 668)">
+              <ellipse cx="508" cy="672" rx="24" ry="6" fill="#0E0704" opacity=".45"/>
+              <circle cx="508" cy="664" r="19" fill="url(#seal)"/>
+              <circle cx="508" cy="664" r="11" fill="none" stroke="#521517" stroke-width="2" opacity=".8"/>
+              <path d="M492,656 a19,19 0 0 1 22,-5" stroke="#E0797A" stroke-width="1.6" fill="none" opacity=".45"/>
+            </g>
+          </svg>
+          <div class="dust" id="dust"></div>
+        </div>
+
+        <div class="vig"></div>
+        <svg class="grain"><filter id="grainF"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#grainF)"/></svg>
+      </div>
+    </div>
+    <div class="hint" id="hint">Move your cursor over the frame</div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="stat"><b>Memories</b><span>24</span></div>
+  <div class="stat"><b>This month</b><span>12</span></div>
+  <div class="stat glow"><b>Current streak</b><span>5 days</span></div>
+  <div class="stat"><b>Favourite mood</b><span>Calm</span></div>
+</div>
+
+<script type="module">
+const scene = document.getElementById('scene');
+const frame = document.getElementById('frame');
+const hint  = document.getElementById('hint');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---- dust motes ---- */
+const dust = document.getElementById('dust');
+for (let i = 0; i < 13; i++){
+  const m = document.createElement('div');
+  m.className = 'mote';
+  const s = 1.6 + Math.random() * 2.6;
+  m.style.width = m.style.height = s + 'px';
+  m.style.left = (25 + Math.random() * 70) + '%';
+  m.style.top  = (30 + Math.random() * 60) + '%';
+  m.style.setProperty('--dx', (Math.random() * 90 - 30) + 'px');
+  m.style.setProperty('--dy', (-60 - Math.random() * 130) + 'px');
+  if (!reduce) m.style.animation = `drift ${20 + Math.random() * 26}s linear ${-Math.random() * 30}s infinite`;
+  dust.appendChild(m);
+}
+
+/* ---- parallax: lerp toward the pointer so it glides, never snaps ---- */
+let tx = 0, ty = 0, cx = 0, cy = 0, raf = null, active = false;
+
+function loop(){
+  cx += (tx - cx) * 0.075;
+  cy += (ty - cy) * 0.075;
+  scene.style.transform = `rotateX(${cy.toFixed(3)}deg) rotateY(${cx.toFixed(3)}deg)`;
+  if (Math.abs(tx - cx) > 0.01 || Math.abs(ty - cy) > 0.01) raf = requestAnimationFrame(loop);
+  else raf = null;
+}
+function kick(){ if (!raf) raf = requestAnimationFrame(loop); }
+
+if (!reduce){
+  frame.addEventListener('pointermove', e => {
+    const r = frame.getBoundingClientRect();
+    tx =  ((e.clientX - r.left) / r.width  - .5) * 12;   // ±6deg
+    ty = -((e.clientY - r.top)  / r.height - .5) * 12;
+    scene.style.transition = 'none';
+    if (!active){ active = true; hint.classList.add('gone'); }
+    kick();
+  });
+  frame.addEventListener('pointerleave', () => {
+    scene.style.transition = 'transform .9s cubic-bezier(.16,.84,.44,1)';
+    tx = ty = 0; kick();
+  });
+}
+</script>
+</body>
+</html>
