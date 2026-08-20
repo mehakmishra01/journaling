@@ -38,7 +38,8 @@ const state = {
   editing: null,
   calYear: null,
   calMonth: null,
-  calBusy: false
+  calBusy: false,
+  lovedDates: new Set()
 };
 
 /* ============================ helpers ============================ */
@@ -98,6 +99,57 @@ function oneLine(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
+function isSealed(e) {
+  return !!(e && (e.sealed === true || e.sealed === "true"));
+}
+
+function isoFromDate(d) {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function tomorrowIso() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return isoFromDate(d);
+}
+
+function addYearsIso(iso, years) {
+  const d = parseIso(iso) || new Date();
+  d.setFullYear(d.getFullYear() + years);
+  return isoFromDate(d);
+}
+
+function findOnThisDay() {
+  const now = new Date();
+  const month = now.getMonth();
+  const day = now.getDate();
+  const year = now.getFullYear();
+  let exact = null;
+  let exactYear = -Infinity;
+  let sameMonth = null;
+  let sameMonthTime = -Infinity;
+
+  for (const e of state.entries) {
+    if (isSealed(e)) continue;
+    const d = parseIso(e.date);
+    if (!d || d.getFullYear() >= year) continue;
+    if (d.getMonth() === month && d.getDate() === day) {
+      if (d.getFullYear() > exactYear) {
+        exact = e;
+        exactYear = d.getFullYear();
+      }
+    } else if (d.getMonth() === month && d.getTime() > sameMonthTime) {
+      sameMonth = e;
+      sameMonthTime = d.getTime();
+    }
+  }
+  if (exact) return { entry: exact, kind: "today" };
+  if (sameMonth) return { entry: sameMonth, kind: "month" };
+  return null;
+}
+
 /* ============================ API ============================ */
 
 async function apiGet(url) {
@@ -119,13 +171,25 @@ async function apiSend(url, method, body) {
 
 async function loadData() {
   try {
-    const [entries, stats] = await Promise.all([
+    const [entries, stats, loved] = await Promise.all([
       apiGet("/api/entries"),
-      apiGet("/api/stats")
+      apiGet("/api/stats"),
+      apiGet("/api/loved-dates")
     ]);
     state.entries = entries;
     state.stats = stats;
+    state.lovedDates = new Set(loved.dates || []);
     renderAll();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function toggleLovedDate(iso) {
+  try {
+    const res = await apiSend("/api/loved-dates/toggle", "POST", { date: iso });
+    state.lovedDates = new Set(res.dates || []);
+    renderCalendar();
   } catch (e) {
     console.error(e);
   }
@@ -171,6 +235,7 @@ function setNavActive(screen) {
 function renderAll() {
   renderGreeting();
   renderHeroStats();
+  renderOnThisDay();
   renderRecent();
   renderMemories();
   renderCalendar();
@@ -208,16 +273,44 @@ function renderHeroStats() {
   ).join("");
 }
 
+function renderOnThisDay() {
+  const wrap = $("#onThisDay");
+  const found = findOnThisDay();
+  if (!wrap) return;
+  if (!found) { wrap.hidden = true; return; }
+  const e = found.entry;
+  const d = parseIso(e.date);
+  const years = new Date().getFullYear() - d.getFullYear();
+  const heading = found.kind === "today"
+    ? (years === 1 ? "One year ago today" : `${years} years ago today`)
+    : (years === 1 ? `From ${MONTHS[d.getMonth()]}, last year` : `From ${MONTHS[d.getMonth()]}, ${d.getFullYear()}`);
+  const kicker = found.kind === "today"
+    ? `On this day  ·  ${fmtFull(e.date)}`
+    : `A page from this month  ·  ${fmtFull(e.date)}`;
+  const quote = oneLine(e.entry);
+  const clip = quote.length > 168 ? quote.slice(0, 168).replace(/\s+\S*$/, "") + "\u2026" : quote;
+  wrap.hidden = false;
+  wrap.removeAttribute("hidden");
+  wrap.querySelector(".onthis-wax span").textContent = String(d.getDate());
+  $("#onThisKicker").textContent = kicker;
+  $("#onThisHeading").textContent = heading;
+  $("#onThisQuote").textContent = clip ? `\u201C${clip}\u201D` : "";
+  $("#onThisLetter").dataset.id = String(e.id);
+  const link = $("#onThisRead");
+  link.dataset.id = e.id;
+}
+
 function renderRecent() {
   const recent = state.entries.slice(0, 3);
   const el = $("#recentList");
   if (recent.length === 0) { el.innerHTML = '<p class="eyebrow">Nothing kept yet.</p>'; return; }
-  el.innerHTML = recent.map(e =>
-    `<a href="#" class="recent-item" data-id="${e.id}">
+  el.innerHTML = recent.map(e => {
+    const title = isSealed(e) ? "A sealed letter" : (e.title || "(untitled)");
+    return `<a href="#" class="recent-item" data-id="${e.id}">
        <span class="short">${esc(fmtShort(e.date))}</span>
-       <span class="r-title">${esc(e.title || "(untitled)")}</span>
-     </a>`
-  ).join("");
+       <span class="r-title">${esc(title)}</span>
+     </a>`;
+  }).join("");
 }
 
 function renderMemories() {
@@ -231,9 +324,21 @@ function renderMemories() {
   empty.style.display = "none";
   grid.innerHTML = state.entries.map((e, i) => {
     const m = moodOf(e.mood);
+    const sealed = isSealed(e);
     const bg = i % 3 === 1 ? "rgba(247,240,224,0.86)" : "rgba(255,252,244,0.62)";
     const rot = (i % 2 ? 0.7 : -0.8) + "deg";
     const offset = i % 3 === 2 ? "26px" : "0px";
+    if (sealed) {
+      return `
+        <article class="memory sealed" data-id="${e.id}" style="transform: rotate(${rot}) translateY(0); margin-top:${offset};">
+          <div class="memory-tape"></div>
+          <div class="memory-wax">seal</div>
+          <div class="eyebrow">${esc(fmtFull(e.date).toUpperCase())}</div>
+          <h3>A letter, waiting</h3>
+          <p class="memory-excerpt">Not to be opened until ${esc(fmtFull(e.sealUntil))}</p>
+          <span class="memory-read">See the seal \u2192</span>
+        </article>`;
+    }
     const strip = e.image
       ? `<div class="memory-strip" style="height:148px;display:flex;"><span>${esc(e.image)}</span></div>`
       : "";
@@ -265,20 +370,103 @@ function ensureCalMonth() {
   state.calMonth = ref.getMonth();
 }
 
-function turnMonth(delta) {
+function calMonthValue(year, month) {
+  return year * 12 + month;
+}
+
+function calYearRange() {
+  const now = new Date().getFullYear();
+  let min = now;
+  let max = now;
+  for (const e of state.entries) {
+    const d = parseIso(e.date);
+    if (!d) continue;
+    min = Math.min(min, d.getFullYear());
+    max = Math.max(max, d.getFullYear());
+  }
+  return { min: min - 2, max: max + 2 };
+}
+
+function syncCalJump() {
+  const yearSel = $("#calJumpYear");
+  const months = $("#calJumpMonths");
+  if (!yearSel || !months) return;
+  ensureCalMonth();
+
+  const { min, max } = calYearRange();
+  const curYear = state.calYear;
+  if (!yearSel.options.length) {
+    for (let y = max; y >= min; y--) {
+      yearSel.add(new Option(String(y), String(y)));
+    }
+  } else {
+    yearSel.innerHTML = "";
+    for (let y = max; y >= min; y--) {
+      yearSel.add(new Option(String(y), String(y)));
+    }
+  }
+  yearSel.value = String(curYear);
+
+  if (!months.children.length) {
+    months.innerHTML = MONTHS_ABBR.map((label, i) =>
+      `<button class="cal-jump-month" type="button" data-month="${i}">${label}</button>`
+    ).join("");
+  }
+  months.querySelectorAll(".cal-jump-month").forEach(btn => {
+    btn.classList.toggle("on", Number(btn.dataset.month) === state.calMonth);
+  });
+}
+
+function openCalJump() {
+  syncCalJump();
+  const panel = $("#calJump");
+  const btn = $("#calTitleBtn");
+  if (!panel || !btn) return;
+  panel.hidden = false;
+  btn.setAttribute("aria-expanded", "true");
+}
+
+function closeCalJump() {
+  const panel = $("#calJump");
+  const btn = $("#calTitleBtn");
+  if (!panel || !btn) return;
+  panel.hidden = true;
+  btn.setAttribute("aria-expanded", "false");
+}
+
+function toggleCalJump() {
+  const panel = $("#calJump");
+  if (!panel) return;
+  if (panel.hidden) openCalJump();
+  else closeCalJump();
+}
+
+function applyCalMonth(year, month) {
+  state.calYear = year;
+  state.calMonth = month;
+  renderCalendar();
+  const title = $("#calTitle");
+  title.classList.remove("ink-in");
+  void title.offsetWidth;
+  title.classList.add("ink-in");
+  syncCalJump();
+}
+
+function jumpToMonth(year, month, keepOpen = false) {
   if (state.calBusy) return;
   ensureCalMonth();
+  const cur = calMonthValue(state.calYear, state.calMonth);
+  const target = calMonthValue(year, month);
+  if (cur === target) {
+    if (!keepOpen) closeCalJump();
+    return;
+  }
+
+  const dir = target > cur ? "next" : "prev";
   const leaf = $("#calLeaf");
-  const title = $("#calTitle");
-  const dir = delta > 0 ? "next" : "prev";
   const apply = () => {
-    state.calMonth += delta;
-    while (state.calMonth < 0) { state.calMonth += 12; state.calYear--; }
-    while (state.calMonth > 11) { state.calMonth -= 12; state.calYear++; }
-    renderCalendar();
-    title.classList.remove("ink-in");
-    void title.offsetWidth;
-    title.classList.add("ink-in");
+    applyCalMonth(year, month);
+    if (!keepOpen) closeCalJump();
   };
 
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -302,6 +490,21 @@ function turnMonth(delta) {
   }, 420);
 }
 
+function jumpToToday() {
+  const d = new Date();
+  jumpToMonth(d.getFullYear(), d.getMonth());
+}
+
+function turnMonth(delta) {
+  if (state.calBusy) return;
+  ensureCalMonth();
+  let year = state.calYear;
+  let month = state.calMonth + delta;
+  while (month < 0) { month += 12; year--; }
+  while (month > 11) { month -= 12; year++; }
+  jumpToMonth(year, month);
+}
+
 function renderCalendar() {
   ensureCalMonth();
   const year = state.calYear;
@@ -310,7 +513,8 @@ function renderCalendar() {
   state.entries.forEach(e => {
     const d = parseIso(e.date);
     if (d && d.getFullYear() === year && d.getMonth() === month) {
-      if (!byDay.has(d.getDate())) byDay.set(d.getDate(), e);
+      const prev = byDay.get(d.getDate());
+      if (!prev || (isSealed(prev) && !isSealed(e))) byDay.set(d.getDate(), e);
     }
   });
 
@@ -330,15 +534,22 @@ function renderCalendar() {
     const m = has ? moodOf(e.mood) : null;
     const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(n).padStart(2, "0")}`;
     const isToday = iso === today;
-    const bg = has ? "rgba(179,154,99,0.16)" : "rgba(255,252,244,0.35)";
-    const bd = has ? "rgba(179,154,99,0.55)" : "rgba(74,52,40,0.12)";
+    const sealed = has && isSealed(e);
+    const bg = has ? (sealed ? "rgba(138,46,44,0.12)" : "rgba(179,154,99,0.16)") : "rgba(255,252,244,0.35)";
+    const bd = has ? (sealed ? "rgba(138,46,44,0.4)" : "rgba(179,154,99,0.55)") : "rgba(74,52,40,0.12)";
     const fg = has ? "#2A211C" : "#8A7A68";
-    const dot = has ? m.color : "transparent";
-    html += `<button class="cal-day ${has ? "has" : ""} ${isToday ? "today" : ""}" ${has ? `data-id="${e.id}"` : ""}
+    const dot = has ? (sealed ? "#8A2E2C" : m.color) : "transparent";
+    const loved = state.lovedDates.has(iso);
+    html += `<div class="cal-day ${has ? "has" : ""} ${sealed ? "sealed" : ""} ${loved ? "loved" : ""} ${isToday ? "today" : ""}"
+        data-iso="${iso}" ${has ? `data-id="${e.id}"` : ""}
         style="--i:${n}; background:${bg}; border-color:${bd}; color:${fg};"
-        aria-label="${n} ${MONTHS[month]} ${year}${has ? ", has a memory" : ""}">
-        ${n}<span class="dot" style="background:${dot};"></span>
-      </button>`;
+        aria-label="${n} ${MONTHS[month]} ${year}${loved ? ", loved day" : ""}${sealed ? ", sealed letter" : has ? ", has a memory" : ""}">
+        <button type="button" class="cal-heart ${loved ? "on" : ""}" aria-label="${loved ? "Remove love sticker" : "Add love sticker"}" aria-pressed="${loved ? "true" : "false"}">
+          <span class="cal-heart-glyph" aria-hidden="true">${loved ? "\u2665" : "\u2661"}</span>
+        </button>
+        <span class="cal-num">${n}</span>
+        <span class="dot" style="background:${dot};"></span>
+      </div>`;
   }
   $("#calGrid").innerHTML = html;
 }
@@ -422,8 +633,31 @@ function resetWriteForm() {
   writeJournalBody("");
   applyMood(null);
   setWriteDate();
+  setSeal(false);
   $("#saveEntry").textContent = "Save memory";
   updateSignOff();
+}
+
+function setSeal(on) {
+  const btn = $("#sealToggle");
+  const when = $("#sealWhen");
+  const input = $("#sealUntil");
+  if (!btn || !when || !input) return;
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+  $("#sealToggleLabel").textContent = on ? "This page will be sealed" : "Seal this page for later";
+  when.hidden = !on;
+  if (on) {
+    input.min = tomorrowIso();
+    if (!input.value) input.value = addYearsIso(todayIso(), 1);
+  } else {
+    input.value = "";
+  }
+}
+
+function sealUntilValue() {
+  const on = $("#sealToggle") && $("#sealToggle").getAttribute("aria-pressed") === "true";
+  const v = ($("#sealUntil") && $("#sealUntil").value) || "";
+  return on && v ? v : "";
 }
 
 function selectMood(label) {
@@ -471,12 +705,14 @@ async function saveEntry() {
   if (!body) { $("#writeBody").focus(); return; }
 
   const editing = state.editing;
+  const sealedUntil = sealUntilValue();
   const payload = {
     date: editing ? editing.date : todayIso(),
     mood: state.mood || "Neutral",
     title: deriveTitle(body),
     entry: body,
-    image: editing ? (editing.image || "") : ""
+    image: editing ? (editing.image || "") : "",
+    sealUntil: sealedUntil
   };
 
   // fire the save ceremony
@@ -484,10 +720,13 @@ async function saveEntry() {
   const paper = $("#savePaper");
   const note = $("#saveNote");
   overlay.style.display = "flex";
+  paper.classList.toggle("waxed", !!sealedUntil);
   paper.style.transform = "rotateX(0deg) scale(1)";
   paper.style.opacity = "1";
   note.style.opacity = "0";
-  note.textContent = editing ? "The page was rewritten." : "Another memory preserved.";
+  note.textContent = editing
+    ? "The page was rewritten."
+    : (sealedUntil ? "Sealed with wax \u2014 not to be opened until " + fmtFull(sealedUntil) + "." : "Another memory preserved.");
 
   setTimeout(() => { paper.style.transform = "rotateX(-26deg) scale(.94)"; note.style.opacity = "1"; }, 120);
   setTimeout(() => { paper.style.transform = "rotateX(-88deg) translateY(-40px) scale(.72)"; paper.style.opacity = "0"; }, 1700);
@@ -593,11 +832,24 @@ function openReader(id) {
   const e = state.entries.find(x => String(x.id) === String(id));
   if (!e) return;
   state.reading = e;
-  const m = moodOf(e.mood);
-  $("#readDate").textContent = fmtFull(e.date).toUpperCase();
-  $("#readTitle").textContent = e.title || "(untitled)";
-  $("#readMood").textContent = `${m.glyph}  felt ${m.label.toLowerCase()}`;
-  $("#readBody").textContent = e.entry || "";
+  const sealed = isSealed(e);
+  const card = $("#readerCard");
+  const open = $("#readerOpen");
+  const closed = $("#readerSealed");
+  card.classList.toggle("is-sealed", sealed);
+  open.hidden = sealed;
+  closed.hidden = !sealed;
+  $("#readEdit").style.display = sealed ? "none" : "";
+  $("#readSign").textContent = sealed ? "\u2014 until then" : "\u2014 Me";
+  if (sealed) {
+    $("#readSealWhen").textContent = fmtFull(e.sealUntil);
+  } else {
+    const m = moodOf(e.mood);
+    $("#readDate").textContent = fmtFull(e.date).toUpperCase();
+    $("#readTitle").textContent = e.title || "(untitled)";
+    $("#readMood").textContent = `${m.glyph}  felt ${m.label.toLowerCase()}`;
+    $("#readBody").textContent = e.entry || "";
+  }
   $("#reader").style.display = "flex";
 }
 
@@ -619,13 +871,14 @@ async function discardReading() {
 }
 
 function editReading() {
-  if (!state.reading) return;
+  if (!state.reading || isSealed(state.reading)) return;
   const e = state.reading;
   closeReader();
   state.editing = e;
   writeJournalBody(e.entry || "");
   applyMood(e.mood);
   setWriteDateFrom(e.date);
+  setSeal(false);
   $("#saveEntry").textContent = "Keep these changes";
   updateSignOff();
   go("write");
@@ -647,18 +900,19 @@ function closeSearch() {
 function renderSearch(query) {
   const q = query.trim().toLowerCase();
   const results = q
-    ? state.entries.filter(e => ((e.title || "") + " " + (e.entry || "")).toLowerCase().includes(q))
+    ? state.entries.filter(e => !isSealed(e) && ((e.title || "") + " " + (e.entry || "")).toLowerCase().includes(q))
     : state.entries.slice(0, 4);
   $("#searchFound").textContent = q
     ? `${results.length} ${results.length === 1 ? "memory" : "memories"} found \u00B7 \u201C${query.trim()}\u201D`
     : "Recently kept";
   $("#searchResults").innerHTML = results.map(e => {
-    const excerptSrc = oneLine(e.entry);
+    const excerptSrc = isSealed(e) ? `Opens ${fmtFull(e.sealUntil)}` : oneLine(e.entry);
     const excerpt = excerptSrc.slice(0, 92) + (excerptSrc.length > 92 ? "\u2026" : "");
+    const title = isSealed(e) ? "A sealed letter" : (e.title || "(untitled)");
     return `<a href="#" class="search-result" data-id="${e.id}">
         <span class="short">${esc(fmtShort(e.date))}</span>
         <span>
-          <span class="sr-title">${esc(e.title || "(untitled)")}</span>
+          <span class="sr-title">${esc(title)}</span>
           <span class="sr-excerpt">${esc(excerpt)}</span>
         </span>
       </a>`;
@@ -698,6 +952,10 @@ function init() {
   // write
   $("#saveEntry").addEventListener("click", saveEntry);
   $("#writeBody").addEventListener("input", updateSignOff);
+  $("#sealToggle").addEventListener("click", () => {
+    const on = $("#sealToggle").getAttribute("aria-pressed") === "true";
+    setSeal(!on);
+  });
   $("#moodPicker").addEventListener("click", (ev) => {
     const btn = ev.target.closest(".mood-opt");
     if (btn) selectMood(btn.dataset.mood, btn);
@@ -723,7 +981,16 @@ function init() {
   };
   $("#recentList").addEventListener("click", openFromCard);
   $("#memoriesGrid").addEventListener("click", openFromCard);
+  $("#onThisDay").addEventListener("click", openFromCard);
   $("#calGrid").addEventListener("click", (ev) => {
+    const heart = ev.target.closest(".cal-heart");
+    if (heart) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const day = heart.closest(".cal-day");
+      if (day && day.dataset.iso) toggleLovedDate(day.dataset.iso);
+      return;
+    }
     const el = ev.target.closest(".cal-day.has");
     if (el) { ev.preventDefault(); openReader(el.dataset.id); }
   });
@@ -736,6 +1003,25 @@ function init() {
 
   $("#calPrev").addEventListener("click", () => turnMonth(-1));
   $("#calNext").addEventListener("click", () => turnMonth(1));
+  $("#calTitleBtn").addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    toggleCalJump();
+  });
+  $("#calJumpYear").addEventListener("change", () => {
+    const year = Number($("#calJumpYear").value);
+    jumpToMonth(year, state.calMonth, true);
+  });
+  $("#calJumpMonths").addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".cal-jump-month");
+    if (!btn) return;
+    const year = Number($("#calJumpYear").value);
+    jumpToMonth(year, Number(btn.dataset.month));
+  });
+  $("#calJumpToday").addEventListener("click", jumpToToday);
+  document.addEventListener("click", (ev) => {
+    const wrap = document.querySelector(".cal-title-wrap");
+    if (wrap && !wrap.contains(ev.target)) closeCalJump();
+  });
 
   // search
   $("#search").addEventListener("click", (ev) => { if (ev.target.id === "search") closeSearch(); });
@@ -743,7 +1029,7 @@ function init() {
 
   // keyboard
   window.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape") { closeReader(); closeSearch(); }
+    if (ev.key === "Escape") { closeReader(); closeSearch(); closeCalJump(); }
     if ((ev.key === "k" || ev.key === "K") && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); openSearch(); }
     if (state.screen === "calendar") {
       const overlaysClosed = $("#reader").style.display === "none" && $("#search").style.display === "none";

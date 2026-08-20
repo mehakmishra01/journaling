@@ -7,9 +7,11 @@ import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 
 /**
@@ -18,12 +20,14 @@ import java.util.TreeSet;
  * consistent.
  */
 public class JournalManager {
-    private static final String HEADER = "id,date,mood,title,entry,image";
+    private static final String HEADER = "id,date,mood,title,entry,image,sealUntil";
     private final Path csvPath;
+    private final Path lovedPath;
     private final Object lock = new Object();
 
     public JournalManager(Path csvPath) {
         this.csvPath = csvPath;
+        this.lovedPath = csvPath.getParent().resolve("loved-dates.txt");
     }
 
     /** Ensure the data directory and CSV file (with header) exist. */
@@ -34,6 +38,9 @@ public class JournalManager {
             }
             if (!Files.exists(csvPath)) {
                 Files.writeString(csvPath, HEADER + System.lineSeparator(), StandardCharsets.UTF_8);
+            }
+            if (!Files.exists(lovedPath)) {
+                Files.writeString(lovedPath, "", StandardCharsets.UTF_8);
             }
         }
     }
@@ -65,9 +72,11 @@ public class JournalManager {
         String m = mood == null ? "" : mood.trim();
 
         for (JournalEntry e : all) {
+            // Do not search inside a letter that is still sealed.
             boolean matchesQuery = q.isEmpty()
-                    || e.getTitle().toLowerCase(Locale.ROOT).contains(q)
-                    || e.getEntry().toLowerCase(Locale.ROOT).contains(q);
+                    || (!e.isSealed() && (
+                            e.getTitle().toLowerCase(Locale.ROOT).contains(q)
+                            || e.getEntry().toLowerCase(Locale.ROOT).contains(q)));
             boolean matchesMood = m.isEmpty() || m.equalsIgnoreCase("All")
                     || e.getMood().equalsIgnoreCase(m);
             if (matchesQuery && matchesMood) {
@@ -78,7 +87,7 @@ public class JournalManager {
     }
 
     /** Add a new entry with an auto-incremented id and persist it. */
-    public JournalEntry add(String date, String mood, String title, String entry, String image) throws IOException {
+    public JournalEntry add(String date, String mood, String title, String entry, String image, String sealUntil) throws IOException {
         synchronized (lock) {
             List<JournalEntry> all = getAll();
             int nextId = 1;
@@ -87,26 +96,37 @@ public class JournalManager {
             }
             String safeDate = (date == null || date.isBlank())
                     ? LocalDate.now().toString() : date.trim();
-            JournalEntry created = new JournalEntry(nextId, safeDate, mood, title, entry, image);
+            JournalEntry created = new JournalEntry(nextId, safeDate, mood, title, entry, image, sealUntil);
             all.add(created);
             writeAll(all);
             return created;
         }
     }
 
+    public JournalEntry getById(int id) throws IOException {
+        for (JournalEntry e : getAll()) {
+            if (e.getId() == id) return e;
+        }
+        return null;
+    }
+
     /** Replace the fields of an existing entry. Returns null if the id is missing. */
-    public JournalEntry update(int id, String date, String mood, String title, String entry, String image) throws IOException {
+    public JournalEntry update(int id, String date, String mood, String title, String entry, String image, String sealUntil) throws IOException {
         synchronized (lock) {
             List<JournalEntry> all = getAll();
             for (int i = 0; i < all.size(); i++) {
                 JournalEntry existing = all.get(i);
                 if (existing.getId() != id) continue;
+                if (existing.isSealed()) {
+                    return existing;
+                }
                 String safeDate = (date == null || date.isBlank()) ? existing.getDate() : date.trim();
                 String safeMood = mood == null ? existing.getMood() : mood;
                 String safeTitle = title == null ? existing.getTitle() : title;
                 String safeEntry = entry == null ? existing.getEntry() : entry;
                 String safeImage = image == null ? existing.getImage() : image;
-                JournalEntry updated = new JournalEntry(id, safeDate, safeMood, safeTitle, safeEntry, safeImage);
+                String safeSeal = sealUntil == null ? existing.getSealUntil() : sealUntil;
+                JournalEntry updated = new JournalEntry(id, safeDate, safeMood, safeTitle, safeEntry, safeImage, safeSeal);
                 all.set(i, updated);
                 writeAll(all);
                 return updated;
@@ -185,6 +205,63 @@ public class JournalManager {
         } catch (DateTimeParseException ex) {
             return null;
         }
+    }
+
+    /** Load calendar dates the user has marked with a love sticker (one ISO date per line). */
+    public Set<String> getLovedDates() throws IOException {
+        synchronized (lock) {
+            Set<String> dates = new LinkedHashSet<>();
+            if (!Files.exists(lovedPath)) return dates;
+            for (String line : Files.readAllLines(lovedPath, StandardCharsets.UTF_8)) {
+                String trimmed = line.trim();
+                if (!trimmed.isEmpty() && parseDate(trimmed) != null) {
+                    dates.add(trimmed);
+                }
+            }
+            return dates;
+        }
+    }
+
+    /** Add or remove a loved date. Returns true if the date is now loved. */
+    public boolean toggleLoved(String date) throws IOException {
+        synchronized (lock) {
+            String safe = date == null ? "" : date.trim();
+            if (parseDate(safe) == null) {
+                throw new IllegalArgumentException("Invalid date");
+            }
+            Set<String> dates = new LinkedHashSet<>(getLovedDates());
+            boolean loved;
+            if (dates.contains(safe)) {
+                dates.remove(safe);
+                loved = false;
+            } else {
+                dates.add(safe);
+                loved = true;
+            }
+            writeLoved(dates);
+            return loved;
+        }
+    }
+
+    public String lovedDatesToJson() throws IOException {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"dates\":[");
+        boolean first = true;
+        for (String d : getLovedDates()) {
+            if (!first) sb.append(',');
+            sb.append(Json.quote(d));
+            first = false;
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private void writeLoved(Set<String> dates) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        for (String d : dates) {
+            sb.append(d).append('\n');
+        }
+        Files.writeString(lovedPath, sb.toString(), StandardCharsets.UTF_8);
     }
 
     /** Overwrite the CSV with the header followed by all entries. */

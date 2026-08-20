@@ -294,6 +294,19 @@
         </div>
       </div>
 
+      <!-- on this day — a pressed page from another year -->
+      <div class="onthis" id="onThisDay" hidden>
+        <article class="onthis-letter" id="onThisLetter">
+          <div class="onthis-wax" aria-hidden="true"><span>18</span></div>
+          <div class="onthis-copy">
+            <p class="onthis-kicker" id="onThisKicker">On this day</p>
+            <h2 class="onthis-heading" id="onThisHeading">A page from another year</h2>
+            <p class="onthis-quote" id="onThisQuote"></p>
+            <a href="#" class="onthis-read" id="onThisRead">Open the old page &rarr;</a>
+          </div>
+        </article>
+      </div>
+
       <!-- reflection card + recently kept -->
       <div class="home-cards">
         <div class="reflect-card">
@@ -325,6 +338,17 @@
           <div class="write-body" id="writeBody" contenteditable="true" data-ph="Your thoughts begin here…"></div>
           <div class="eyebrow" style="margin-top:44px;">How does today feel</div>
           <div class="mood-picker" id="moodPicker"></div>
+          <div class="seal-row" id="sealRow">
+            <button class="seal-toggle" id="sealToggle" type="button" aria-pressed="false">
+              <span class="seal-blob" aria-hidden="true"></span>
+              <span id="sealToggleLabel">Seal this page for later</span>
+            </button>
+            <div class="seal-when" id="sealWhen" hidden>
+              <label class="seal-label" for="sealUntil">Not to be opened until</label>
+              <input class="seal-date" id="sealUntil" type="date">
+              <p class="seal-hint">A letter to whoever you will be. The wax holds until that morning.</p>
+            </div>
+          </div>
           <div class="write-foot">
             <div class="signoff" id="signOff">&mdash; Me</div>
             <button class="save-btn" id="saveEntry">Save memory</button>
@@ -359,7 +383,20 @@
               <span class="cal-turn-glyph" aria-hidden="true">‹</span>
               <span class="cal-turn-label">Earlier</span>
             </button>
-            <h2 class="cal-title" id="calTitle">August<span> 2026</span></h2>
+            <div class="cal-title-wrap">
+              <button class="cal-title-btn" id="calTitleBtn" type="button" aria-expanded="false" aria-controls="calJump">
+                <h2 class="cal-title" id="calTitle">August<span> 2026</span></h2>
+                <span class="cal-jump-hint">Open any month</span>
+              </button>
+              <div class="cal-jump" id="calJump" hidden>
+                <div class="cal-jump-head">
+                  <span class="eyebrow">Turn to any page</span>
+                  <select class="cal-jump-year" id="calJumpYear" aria-label="Year"></select>
+                </div>
+                <div class="cal-jump-months" id="calJumpMonths"></div>
+                <button class="cal-jump-today" id="calJumpToday" type="button">Back to today</button>
+              </div>
+            </div>
             <button class="cal-turn" id="calNext" type="button" aria-label="Later month">
               <span class="cal-turn-label">Later</span>
               <span class="cal-turn-glyph" aria-hidden="true">›</span>
@@ -372,7 +409,7 @@
             <div class="cal-grid" id="calGrid"></div>
           </div>
         </div>
-        <p class="cal-foot">Marked days hold a memory &mdash; turn the page, or select a day to read it.</p>
+        <p class="cal-foot">Tap the little heart on any day to mark a loved date. Marked days hold a memory &mdash; select a day to read it.</p>
       </div>
     </section>
 
@@ -419,17 +456,26 @@
 
   <!-- ░░ READER ░░ -->
   <div class="reader-overlay" id="reader" style="display:none;">
-    <article class="reader-card">
-      <div class="eyebrow" id="readDate"></div>
-      <h3 class="read-title" id="readTitle"></h3>
-      <div class="read-mood" id="readMood"></div>
-      <p class="read-body" id="readBody"></p>
+    <article class="reader-card" id="readerCard">
+      <div class="reader-open" id="readerOpen">
+        <div class="eyebrow" id="readDate"></div>
+        <h3 class="read-title" id="readTitle"></h3>
+        <div class="read-mood" id="readMood"></div>
+        <p class="read-body" id="readBody"></p>
+      </div>
+      <div class="reader-sealed" id="readerSealed" hidden>
+        <div class="wax-seal" aria-hidden="true"><span>wait</span></div>
+        <p class="sealed-kicker">A letter, still closed</p>
+        <h3 class="sealed-title">Not to be opened until</h3>
+        <p class="sealed-when" id="readSealWhen"></p>
+        <p class="sealed-note">The wax is still warm. Come back on that morning &mdash; the page will be waiting.</p>
+      </div>
       <div class="read-foot">
         <div class="read-actions">
           <a href="#" class="read-edit" id="readEdit">Edit this memory</a>
           <a href="#" class="read-discard" id="readDiscard">Discard this memory</a>
         </div>
-        <span class="read-sign">&mdash; Me</span>
+        <span class="read-sign" id="readSign">&mdash; Me</span>
       </div>
     </article>
   </div>

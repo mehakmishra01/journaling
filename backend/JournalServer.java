@@ -150,6 +150,20 @@ public class JournalServer {
             return;
         }
 
+        if (path.equals("/api/loved-dates")) {
+            if (method.equals("GET")) {
+                sendJson(exchange, 200, manager.lovedDatesToJson());
+                return;
+            }
+            sendText(exchange, 405, "Method Not Allowed");
+            return;
+        }
+
+        if (path.equals("/api/loved-dates/toggle") && method.equals("POST")) {
+            handleToggleLoved(exchange);
+            return;
+        }
+
         sendJson(exchange, 404, "{\"error\":\"Not found\"}");
     }
 
@@ -178,13 +192,14 @@ public class JournalServer {
         String mood = data.getOrDefault("mood", "").trim();
         String date = data.getOrDefault("date", "").trim();
         String image = data.getOrDefault("image", "").trim();
+        String sealUntil = data.getOrDefault("sealUntil", "").trim();
 
         if (title.isEmpty() && entryText.isEmpty()) {
             sendJson(exchange, 400, "{\"error\":\"Title or entry text is required\"}");
             return;
         }
 
-        JournalEntry created = manager.add(date, mood, title, entryText, image);
+        JournalEntry created = manager.add(date, mood, title, entryText, image, sealUntil);
         sendJson(exchange, 201, created.toJson());
     }
 
@@ -206,13 +221,20 @@ public class JournalServer {
         String mood = data.getOrDefault("mood", "").trim();
         String date = data.getOrDefault("date", "").trim();
         String image = data.containsKey("image") ? data.get("image").trim() : null;
+        String sealUntil = data.containsKey("sealUntil") ? data.get("sealUntil").trim() : null;
+
+        JournalEntry existing = manager.getById(id);
+        if (existing != null && existing.isSealed()) {
+            sendJson(exchange, 409, "{\"error\":\"This letter is still sealed\"}");
+            return;
+        }
 
         if (title.isEmpty() && entryText.isEmpty()) {
             sendJson(exchange, 400, "{\"error\":\"Title or entry text is required\"}");
             return;
         }
 
-        JournalEntry updated = manager.update(id, date, mood, title, entryText, image);
+        JournalEntry updated = manager.update(id, date, mood, title, entryText, image, sealUntil);
         if (updated == null) {
             sendJson(exchange, 404, "{\"error\":\"Entry not found\"}");
             return;
@@ -234,6 +256,22 @@ public class JournalServer {
             sendJson(exchange, 200, "{\"deleted\":" + id + "}");
         } else {
             sendJson(exchange, 404, "{\"error\":\"Entry not found\"}");
+        }
+    }
+
+    private void handleToggleLoved(HttpExchange exchange) throws IOException {
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        Map<String, String> data = Json.parseObject(body);
+        String date = data.getOrDefault("date", "").trim();
+        try {
+            boolean loved = manager.toggleLoved(date);
+            String datesJson = manager.lovedDatesToJson();
+            int start = datesJson.indexOf('[');
+            int end = datesJson.lastIndexOf(']') + 1;
+            String response = "{\"loved\":" + loved + ",\"dates\":" + datesJson.substring(start, end) + "}";
+            sendJson(exchange, 200, response);
+        } catch (IllegalArgumentException ex) {
+            sendJson(exchange, 400, "{\"error\":\"Invalid date\"}");
         }
     }
 
